@@ -193,14 +193,13 @@ st.sidebar.header("Controls")
 
 # Country selection
 all_countries = sorted(df['Country'].unique())
-# Select top 10 countries by data completeness
-country_counts = df['Country'].value_counts()
-top_countries = country_counts.head(10).index.tolist()
+# Default selection: Ireland, United Kingdom, Spain, Finland, Sweden, Portugal, Poland
+default_countries = ['Ireland', 'United Kingdom', 'Spain', 'Finland', 'Sweden', 'Portugal', 'Poland']
 
 selected_countries = st.sidebar.multiselect(
     "Select Countries",
     all_countries,
-    default=top_countries,
+    default=default_countries,
     help="Choose countries to display in charts and analysis"
 )
 
