@@ -180,6 +180,29 @@ def plot_yearly_prices(df: pd.DataFrame) -> go.Figure:
     fig.update_layout(height=400, hovermode='x unified')
     return fig
 
+@st.cache_data
+def create_yearly_table(df: pd.DataFrame) -> pd.DataFrame:
+    """Create a pivot table with countries as rows and years as columns"""
+    df_yearly = df.copy()
+    df_yearly['Year'] = df_yearly['Date'].dt.year
+    
+    # Calculate yearly averages
+    yearly_avg = df_yearly.groupby(['Country', 'Year'])['price_eur_mwh'].mean().reset_index()
+    
+    # Create pivot table with countries as rows and years as columns
+    pivot_table = yearly_avg.pivot(index='Country', columns='Year', values='price_eur_mwh')
+    
+    # Round to 1 decimal place
+    pivot_table = pivot_table.round(1)
+    
+    # Sort countries alphabetically
+    pivot_table = pivot_table.sort_index()
+    
+    # Add a total row with average across all years
+    pivot_table.loc['Average'] = pivot_table.mean()
+    
+    return pivot_table
+
 # Load and clean data
 @st.cache_data
 def load_data():
@@ -286,6 +309,11 @@ if selected_countries and start_date and end_date:
     st.subheader("Annual Averages")
     fig_yearly = plot_yearly_prices(filtered_df)
     st.plotly_chart(fig_yearly, width='stretch')
+    
+    # Yearly price table
+    st.subheader("Yearly Price Table")
+    yearly_table = create_yearly_table(filtered_df)
+    st.dataframe(yearly_table, width='stretch')
     
     # Data table and downloads
     st.subheader("Data Table")
