@@ -294,11 +294,14 @@ if 'show_datacenter_results' not in st.session_state:
     }
 
 # Create tabs - Data Center tab first to make it default
-tab1, tab2 = st.tabs(["🏢 Data Center Cost Analysis", "📊 Price Analysis"])
+tab1, tab2, tab3 = st.tabs(["📊 Price Analysis", "🏢 Data Center Cost Analysis", "🗺️ Interactive Map"])
 
 with tab1:
-    # Data Center Cost Analysis
-    st.header("🏢 Data Center Cost Analysis")
+    # Price Analysis
+    st.header("📊 Price Analysis")
+    
+    # Sidebar controls for price analysis
+    st.sidebar.header("Price Analysis Controls")
 
     # Country selection
     all_countries = sorted(df['Country'].unique())
@@ -445,45 +448,37 @@ with tab1:
         st.warning("Please select at least one country and valid date range.")
 
 with tab2:
-    # Sidebar controls for price analysis
-    st.sidebar.header("Price Analysis Controls")
+    # Data Center Cost Analysis
+    st.header("🏢 Data Center Cost Analysis")
     
-    st.markdown("""
-    This tool calculates the annual electricity costs for a data center across different European countries.
-    Adjust the parameters below to see how location affects your data center's electricity costs.
-    """)
-    
-    # Formula explanation
-    with st.expander("📋 Calculation Formulas", expanded=False):
-        st.markdown("""
-        **Data Center Electricity Cost Calculation:**
-        
-        1. **Average IT Load** = IT Load (MW) × Utilization Rate (%)
-        2. **Total Facility Power** = Average IT Load (MW) × PUE
-        3. **Annual Consumption** = Total Facility Power (MW) × 8,760 hours/year
-        4. **Annual Cost** = Annual Consumption (MWh) × 2024 Average Price (€/MWh)
-        
-        **Where:**
-        - **IT Load**: Total IT equipment power capacity
-        - **Utilization Rate**: Percentage of IT load actively used (accounts for idle time)
-        - **PUE (Power Usage Effectiveness)**: Ratio of total facility power to IT power (includes cooling, lighting, etc.)
-        - **8,760 hours**: Total hours in a year (24 × 365)
-        - **2024 Average Price**: Mean electricity price for each country in 2024
-        
-        **Example:** 100MW IT load, 70% utilization, 1.2 PUE
-        - Average IT Load = 100 × 0.7 = 70 MW
-        - Total Facility Power = 70 × 1.2 = 84 MW  
-        - Annual Consumption = 84 × 8,760 = 735,840 MWh
-        - Annual Cost = 735,840 × Price (€/MWh)
-        """)
-    
-    # Input controls in the main tab
-    st.subheader("Data Center Configuration")
-    
-    col1, col2, col3 = st.columns(3)
+    # Streamlined introduction
+    col1, col2 = st.columns([2, 1])
     
     with col1:
-        # IT Load selection
+        st.markdown("""
+        **Calculate annual electricity costs for your data center across European countries.**
+        Configure your data center parameters below to see location-based cost comparisons.
+        """)
+    
+    with col2:
+        with st.expander("📋 How it works", expanded=False):
+            st.markdown("""
+            **Formula:** Annual Cost = IT Load × Utilization × PUE × 8,760 hours × Electricity Price
+            
+            - **IT Load**: Equipment power capacity (MW)
+            - **Utilization**: Active usage percentage
+            - **PUE**: Power efficiency ratio (includes cooling, etc.)
+            - **8,760**: Hours per year
+            - **Price**: 2024 average electricity price (€/MWh)
+            """)
+    
+    # Streamlined configuration section
+    st.subheader("⚙️ Data Center Configuration")
+    
+    # Create a more compact configuration layout
+    config_col1, config_col2, config_col3, config_col4 = st.columns([2, 2, 2, 1])
+    
+    with config_col1:
         it_load_options = [50, 100, 150, 200]
         default_it_load = st.session_state.calc_params.get('it_load_mw', 100)
         it_load_index = it_load_options.index(default_it_load) if default_it_load in it_load_options else 1
@@ -491,11 +486,10 @@ with tab2:
             "IT Load (MW)",
             it_load_options,
             index=it_load_index,
-            help="Total IT load capacity of the data center"
+            help="Total IT equipment power capacity"
         )
     
-    with col2:
-        # Utilization rate selection
+    with config_col2:
         utilization_options = [0.5, 0.6, 0.7, 0.8]
         default_utilization = st.session_state.calc_params.get('utilization_rate', 0.7)
         util_index = utilization_options.index(default_utilization) if default_utilization in utilization_options else 2
@@ -504,276 +498,522 @@ with tab2:
             utilization_options,
             index=util_index,
             format_func=lambda x: f"{x*100:.0f}%",
-            help="Percentage of IT load that is actively used"
+            help="Percentage of IT load actively used"
         )
     
-    with col3:
-        # PUE selection
+    with config_col3:
         pue_options = [1.1, 1.2, 1.3, 1.4, 1.5]
         default_pue = st.session_state.calc_params.get('pue', 1.2)
         pue_index = pue_options.index(default_pue) if default_pue in pue_options else 1
         pue = st.selectbox(
-            "Power Usage Effectiveness (PUE)",
+            "PUE",
             pue_options,
             index=pue_index,
-            help="PUE measures data center efficiency (lower is better)"
+            help="Power Usage Effectiveness (lower = better)"
         )
     
-    # Update session state when parameters change
+    with config_col4:
+        st.markdown("")  # Spacer
+        if st.button("🔄 Calculate", type="primary"):
+            st.session_state.calc_params = {
+                'it_load_mw': it_load_mw,
+                'utilization_rate': utilization_rate,
+                'pue': pue
+            }
+            st.session_state.show_datacenter_results = True
+            st.rerun()
+    
+    # Auto-update when parameters change
     current_params = {
         'it_load_mw': it_load_mw,
         'utilization_rate': utilization_rate,
         'pue': pue
     }
     
-    # Check if parameters have changed
     if current_params != st.session_state.calc_params:
         st.session_state.calc_params = current_params
         st.session_state.show_datacenter_results = True
         st.rerun()
     
-    # Calculate and display results
-    if st.button("Calculate Costs", type="primary"):
-        # Store calculation parameters in session state
-        st.session_state.calc_params = {
-            'it_load_mw': it_load_mw,
-            'utilization_rate': utilization_rate,
-            'pue': pue
-        }
-        st.session_state.show_datacenter_results = True
-        st.rerun()
-    
-    # Check if we have calculation results to display
+    # Display results if available
     if st.session_state.show_datacenter_results and 'calc_params' in st.session_state:
-        # Get parameters from session state
         params = st.session_state.calc_params
         it_load_mw = params['it_load_mw']
         utilization_rate = params['utilization_rate']
         pue = params['pue']
         
-        # Calculate efficiency metrics
+        # Calculate metrics
         efficiency_metrics = calculate_datacenter_efficiency_metrics(it_load_mw, utilization_rate, pue)
-        
-        # Display efficiency metrics
-        st.subheader("Data Center Configuration")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("IT Load", f"{efficiency_metrics['IT Load (MW)']} MW")
-            st.metric("Utilization", efficiency_metrics['Utilization Rate'])
-        
-        with col2:
-            st.metric("Average IT Load", f"{efficiency_metrics['Average IT Load (MW)']} MW")
-            st.metric("PUE", efficiency_metrics['PUE'])
-        
-        with col3:
-            st.metric("Total Facility Power", f"{efficiency_metrics['Total Facility Power (MW)']} MW")
-            st.metric("Annual Consumption", f"{efficiency_metrics['Annual Consumption (MWh)']:,} MWh")
-        
-        # Calculate costs for all countries
         costs_df = calculate_datacenter_costs(df, it_load_mw, utilization_rate, pue)
-        
-        # Display results
-        st.subheader("Annual Electricity Costs by Country")
-        st.markdown(f"*Sorted by total annual cost (cheapest to most expensive)*")
-        
-        # Get the price column name (either 2024 Avg Price or Latest Price)
         price_column = [col for col in costs_df.columns if 'Price' in col][0]
         
-        # Format the dataframe for better display
-        display_costs_df = costs_df.copy()
-        display_costs_df['Annual Cost (€)'] = display_costs_df['Annual Cost (€)'].apply(lambda x: f"€{x:,.0f}")
-        display_costs_df['Annual Cost (€M)'] = display_costs_df['Annual Cost (€M)'].apply(lambda x: f"€{x:.1f}M")
-        display_costs_df['Annual MWh'] = display_costs_df['Annual MWh'].apply(lambda x: f"{x:,.0f}")
-        
-        st.dataframe(
-            display_costs_df[['Country', price_column, 'Annual Cost (€M)']],
-            width='stretch',
-            hide_index=True
-        )
-        
-        # Bar chart visualization
-        st.subheader("Cost Comparison Chart")
-        
-        # Create horizontal bar chart with better colors and all countries
-        fig_bar = px.bar(
-            costs_df,  # Show ALL countries
-            x='Annual Cost (€M)',
-            y='Country',
-            orientation='h',
-            title="Annual Electricity Costs by Country",
-            color='Annual Cost (€M)',
-            color_continuous_scale=[[0, 'green'], [0.5, 'gold'], [1, 'red']],  # Custom: green to gold to red
-            labels={'Annual Cost (€M)': 'Annual Cost (€M)', 'Country': 'Country'}
-        )
-        
-        # Update layout for better appearance
-        fig_bar.update_layout(
-            height=max(400, len(costs_df) * 25),  # Dynamic height based on number of countries
-            showlegend=False,
-            plot_bgcolor='rgba(248,249,250,1)',
-            paper_bgcolor='rgba(255,255,255,1)',
-            font=dict(size=11, family="Arial, sans-serif"),
-            title_font_size=20,
-            title_x=0.0,  # Left align the title
-            margin=dict(l=20, r=20, t=80, b=20)  # Proper top margin for title above chart
-        )
-        
-        # Update x-axis (costs)
-        fig_bar.update_xaxes(
-            showgrid=True,
-            gridwidth=1,
-            gridcolor='rgba(200,200,200,0.3)',
-            title="Annual Cost (€M)",
-            title_font_size=14,
-            tickfont_size=11
-        )
-        
-        # Update y-axis (countries)
-        fig_bar.update_yaxes(
-            showgrid=False,
-            title="",
-            tickfont_size=10,
-            categoryorder='total descending'  # Sort by value (cheapest first at top)
-        )
-        
-        # Update color bar for better visibility
-        fig_bar.update_coloraxes(
-            colorbar=dict(
-                title="Cost (€M)",
-                title_font_size=12,
-                tickfont_size=10,
-                len=0.8,
-                y=0.5,
-                yanchor='middle'
-            )
-        )
-        
-        st.plotly_chart(fig_bar, use_container_width=True)
-        
-        # Country Comparison Section
-        st.subheader("Compare Specific Countries")
-        
-        # Get unique countries for selection
-        available_countries = costs_df['Country'].tolist()
-        
-        col1, col2, col3 = st.columns(3)
+        # Key metrics at the top
+        st.subheader("📊 Key Metrics")
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            country1 = st.selectbox(
-                "Select Country 1",
-                available_countries,
-                index=0,
-                help="Choose first country for comparison"
-            )
-        
+            st.metric("Total Power", f"{efficiency_metrics['Total Facility Power (MW)']} MW")
         with col2:
-            country2 = st.selectbox(
-                "Select Country 2", 
-                available_countries,
-                index=1,
-                help="Choose second country for comparison"
-            )
-        
+            st.metric("Annual Consumption", f"{efficiency_metrics['Annual Consumption (MWh)']:,} MWh")
         with col3:
-            country3 = st.selectbox(
-                "Select Country 3",
-                available_countries,
-                index=2,
-                help="Choose third country for comparison"
-            )
+            cheapest_country = costs_df.iloc[0]['Country']
+            cheapest_cost = costs_df.iloc[0]['Annual Cost (€M)']
+            st.metric("Cheapest Location", cheapest_country, f"€{cheapest_cost:.1f}M")
+        with col4:
+            most_expensive_country = costs_df.iloc[-1]['Country']
+            most_expensive_cost = costs_df.iloc[-1]['Annual Cost (€M)']
+            st.metric("Most Expensive", most_expensive_country, f"€{most_expensive_cost:.1f}M")
         
-        # Filter data for selected countries
-        selected_countries_data = costs_df[costs_df['Country'].isin([country1, country2, country3])].copy()
+        # Main results in tabs for better organization
+        tab_results, tab_comparison, tab_insights = st.tabs(["📈 All Countries", "🔍 Compare Countries", "💡 Insights"])
         
-        if len(selected_countries_data) > 0:
-            st.subheader("Selected Countries Cost Comparison")
+        with tab_results:
+            st.subheader("Annual Electricity Costs by Country")
             
-            # Create comparison metrics
-            comparison_data = []
-            for _, row in selected_countries_data.iterrows():
-                country = row['Country']
-                price = row[price_column]
-                annual_cost = row['Annual Cost (€M)']
-                
-                # Calculate rank (1 = cheapest)
-                rank = costs_df[costs_df['Country'] == country].index[0] + 1
-                
-                comparison_data.append({
-                    'Country': country,
-                    'Rank': f"#{rank}",
-                    'Price (€/MWh)': price,
-                    'Annual Cost (€M)': annual_cost,
-                    'vs Cheapest': f"{((annual_cost / selected_countries_data['Annual Cost (€M)'].min()) - 1) * 100:.1f}%"
-                })
+            # Compact table with better formatting
+            display_costs_df = costs_df.copy()
+            display_costs_df['Annual Cost (€M)'] = display_costs_df['Annual Cost (€M)'].apply(lambda x: f"€{x:.1f}M")
+            display_costs_df['Price (€/MWh)'] = display_costs_df[price_column].apply(lambda x: f"€{x:.2f}")
             
-            # Sort by cost for display
-            comparison_df = pd.DataFrame(comparison_data).sort_values('Annual Cost (€M)')
-            
-            # Display comparison table
             st.dataframe(
-                comparison_df[['Country', 'Rank', 'Price (€/MWh)', 'Annual Cost (€M)', 'vs Cheapest']],
+                display_costs_df[['Country', 'Price (€/MWh)', 'Annual Cost (€M)']],
                 width='stretch',
                 hide_index=True
             )
             
-            # Key insights
-            st.subheader("Key Insights")
-            cheapest = comparison_df.iloc[0]
-            most_expensive = comparison_df.iloc[-1]
-            cost_difference = most_expensive['Annual Cost (€M)'] - cheapest['Annual Cost (€M)']
+            # Chart
+            fig_bar = px.bar(
+                costs_df,
+                x='Annual Cost (€M)',
+                y='Country',
+                orientation='h',
+                title="Cost Comparison by Country",
+                color='Annual Cost (€M)',
+                color_continuous_scale=[[0, 'green'], [0.5, 'gold'], [1, 'red']],
+                labels={'Annual Cost (€M)': 'Annual Cost (€M)', 'Country': 'Country'}
+            )
+            
+            fig_bar.update_layout(
+                height=max(400, len(costs_df) * 25),
+                showlegend=False,
+                plot_bgcolor='rgba(248,249,250,1)',
+                paper_bgcolor='rgba(255,255,255,1)',
+                font=dict(size=11, family="Arial, sans-serif"),
+                title_font_size=16,
+                title_x=0.0,
+                margin=dict(l=20, r=20, t=60, b=20)
+            )
+            
+            fig_bar.update_xaxes(
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='rgba(200,200,200,0.3)',
+                title="Annual Cost (€M)",
+                title_font_size=14,
+                tickfont_size=11
+            )
+            
+            fig_bar.update_yaxes(
+                showgrid=False,
+                title="",
+                tickfont_size=10,
+                categoryorder='total descending'
+            )
+            
+            fig_bar.update_coloraxes(
+                colorbar=dict(
+                    title="Cost (€M)",
+                    title_font_size=12,
+                    tickfont_size=10,
+                    len=0.8,
+                    y=0.5,
+                    yanchor='middle'
+                )
+            )
+            
+            st.plotly_chart(fig_bar, width='stretch')
+        
+        with tab_comparison:
+            st.subheader("🔍 Compare Specific Countries")
+            
+            # Country selection with modern styling
+            st.markdown("**Select up to 3 countries to compare:**")
+            available_countries = costs_df['Country'].tolist()
+            default_countries = ['Finland', 'United Kingdom', 'Spain']
+            default_indices = []
+            
+            for country in default_countries:
+                if country in available_countries:
+                    default_indices.append(available_countries.index(country))
+                else:
+                    default_indices.append(0)
             
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.metric(
-                    "Cheapest Selected", 
-                    cheapest['Country'], 
-                    f"€{cheapest['Annual Cost (€M)']:.1f}M"
-                )
-            
+                country1 = st.selectbox("🌍 Country 1", available_countries, index=default_indices[0], key="country1")
             with col2:
-                st.metric(
-                    "Most Expensive Selected", 
-                    most_expensive['Country'], 
-                    f"€{most_expensive['Annual Cost (€M)']:.1f}M"
-                )
-            
+                country2 = st.selectbox("🌍 Country 2", available_countries, index=default_indices[1], key="country2")
             with col3:
-                st.metric(
-                    "Cost Difference", 
-                    f"€{cost_difference:.1f}M", 
-                    f"{((most_expensive['Annual Cost (€M)'] / cheapest['Annual Cost (€M)']) - 1) * 100:.1f}% more"
+                country3 = st.selectbox("🌍 Country 3", available_countries, index=default_indices[2], key="country3")
+            
+            # Filter and display comparison
+            selected_countries_data = costs_df[costs_df['Country'].isin([country1, country2, country3])].copy()
+            
+            if len(selected_countries_data) > 0:
+                # Create comparison metrics
+                comparison_data = []
+                
+                # Calculate price-based ranking
+                df_2024 = df[df['Date'].dt.year == 2024]
+                if len(df_2024) > 0:
+                    price_rankings = df_2024.groupby('Country')['price_eur_mwh'].mean().reset_index()
+                    price_rankings = price_rankings.sort_values('price_eur_mwh', ascending=True).reset_index(drop=True)
+                else:
+                    price_rankings = df.groupby('Country')['price_eur_mwh'].last().reset_index()
+                    price_rankings = price_rankings.sort_values('price_eur_mwh', ascending=True).reset_index(drop=True)
+                
+                for _, row in selected_countries_data.iterrows():
+                    country = row['Country']
+                    price = row[price_column]
+                    annual_cost = row['Annual Cost (€M)']
+                    
+                    rank = price_rankings[price_rankings['Country'] == country].index[0] + 1
+                    
+                    comparison_data.append({
+                        'Country': country,
+                        'Rank': f"#{rank}",
+                        'Price (€/MWh)': price,
+                        'Annual Cost (€M)': annual_cost,
+                        'vs Cheapest': f"{((annual_cost / selected_countries_data['Annual Cost (€M)'].min()) - 1) * 100:.1f}%"
+                    })
+                
+                comparison_df = pd.DataFrame(comparison_data).sort_values('Annual Cost (€M)')
+                
+                # Modern country cards
+                st.subheader("📊 Country Comparison Cards")
+                
+                # Create country cards in a grid
+                card_cols = st.columns(len(comparison_df))
+                
+                for i, (_, row) in enumerate(comparison_df.iterrows()):
+                    with card_cols[i]:
+                        country = row['Country']
+                        rank = row['Rank']
+                        price = row['Price (€/MWh)']
+                        annual_cost = row['Annual Cost (€M)']
+                        vs_cheapest = row['vs Cheapest']
+                        
+                        # Determine card color based on cost
+                        if i == 0:  # Cheapest
+                            card_color = "success"
+                            card_icon = "🏆"
+                            card_title = f"{card_icon} Best Value"
+                        elif i == len(comparison_df) - 1:  # Most expensive
+                            card_color = "error"
+                            card_icon = "💸"
+                            card_title = f"{card_icon} Premium"
+                        else:  # Middle
+                            card_color = "warning"
+                            card_icon = "⚖️"
+                            card_title = f"{card_icon} Balanced"
+                        
+                        # Create the card
+                        if card_color == "success":
+                            st.success(f"""
+                            **{card_title}**
+                            
+                            **{country}** {rank}
+                            
+                            **€{price:.2f}/MWh**
+                            **€{annual_cost:.1f}M/year**
+                            
+                            {vs_cheapest} vs cheapest
+                            """)
+                        elif card_color == "error":
+                            st.error(f"""
+                            **{card_title}**
+                            
+                            **{country}** {rank}
+                            
+                            **€{price:.2f}/MWh**
+                            **€{annual_cost:.1f}M/year**
+                            
+                            {vs_cheapest} vs cheapest
+                            """)
+                        else:
+                            st.warning(f"""
+                            **{card_title}**
+                            
+                            **{country}** {rank}
+                            
+                            **€{price:.2f}/MWh**
+                            **€{annual_cost:.1f}M/year**
+                            
+                            {vs_cheapest} vs cheapest
+                            """)
+                
+                # Visual comparison chart
+                st.subheader("📈 Visual Comparison")
+                
+                # Create a modern comparison chart
+                fig_comparison = px.bar(
+                    comparison_df,
+                    x='Country',
+                    y='Annual Cost (€M)',
+                    color='Annual Cost (€M)',
+                    color_continuous_scale=[[0, '#2E8B57'], [0.5, '#FFD700'], [1, '#DC143C']],
+                    title="Annual Cost Comparison",
+                    labels={'Annual Cost (€M)': 'Annual Cost (€M)', 'Country': 'Country'},
+                    text='Annual Cost (€M)'
                 )
+                
+                # Update layout for modern look
+                fig_comparison.update_layout(
+                    height=400,
+                    showlegend=False,
+                    plot_bgcolor='rgba(248,249,250,1)',
+                    paper_bgcolor='rgba(255,255,255,1)',
+                    font=dict(size=12, family="Arial, sans-serif"),
+                    title_font_size=18,
+                    title_x=0.0,
+                    margin=dict(l=20, r=20, t=60, b=20)
+                )
+                
+                # Update axes
+                fig_comparison.update_xaxes(
+                    title="Country",
+                    title_font_size=14,
+                    tickfont_size=12,
+                    showgrid=False
+                )
+                
+                fig_comparison.update_yaxes(
+                    title="Annual Cost (€M)",
+                    title_font_size=14,
+                    tickfont_size=12,
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='rgba(200,200,200,0.3)'
+                )
+                
+                # Add value labels on bars
+                fig_comparison.update_traces(
+                    texttemplate='€%{y:.1f}M',
+                    textposition='outside'
+                )
+                
+                st.plotly_chart(fig_comparison, width='stretch')
+                
+                # Transmission charges section with modern cards
+                st.subheader("⚡ Transmission Charges Analysis")
+                st.markdown("**Transmission charges** are additional costs for high-voltage power delivery (20% of wholesale price).")
+                
+                transmission_multiplier = 0.2
+                transmission_data = []
+                
+                for _, row in comparison_df.iterrows():
+                    country = row['Country']
+                    wholesale_price = row['Price (€/MWh)']
+                    transmission_charge = wholesale_price * transmission_multiplier
+                    total_price = wholesale_price + transmission_charge
+                    
+                    annual_mwh = efficiency_metrics['Annual Consumption (MWh)']
+                    annual_cost_with_transmission = annual_mwh * total_price / 1_000_000
+                    
+                    transmission_data.append({
+                        'Country': country,
+                        'Wholesale Price (€/MWh)': round(wholesale_price, 2),
+                        'Transmission Charge (€/MWh)': round(transmission_charge, 2),
+                        'Total Price (€/MWh)': round(total_price, 2),
+                        'Annual Cost with Transmission (€M)': round(annual_cost_with_transmission, 2)
+                    })
+                
+                transmission_df = pd.DataFrame(transmission_data)
+                
+                # Modern transmission cards
+                st.subheader("🔌 Transmission Cost Breakdown")
+                
+                trans_cols = st.columns(len(transmission_df))
+                
+                for i, (_, row) in enumerate(transmission_df.iterrows()):
+                    with trans_cols[i]:
+                        country = row['Country']
+                        wholesale_price = row['Wholesale Price (€/MWh)']
+                        transmission_charge = row['Transmission Charge (€/MWh)']
+                        total_price = row['Total Price (€/MWh)']
+                        annual_cost = row['Annual Cost with Transmission (€M)']
+                        
+                        # Calculate percentage increase
+                        price_increase_pct = (transmission_charge / wholesale_price) * 100
+                        
+                        st.info(f"""
+                        **⚡ {country}**
+                        
+                        **Wholesale**: €{wholesale_price:.2f}/MWh
+                        **Transmission**: €{transmission_charge:.2f}/MWh (+{price_increase_pct:.0f}%)
+                        **Total**: €{total_price:.2f}/MWh
+                        
+                        **Annual Cost**: €{annual_cost:.1f}M
+                        """)
+                
+                # Key insights with modern metrics
+                st.subheader("💡 Key Insights")
+                cheapest = comparison_df.iloc[0]
+                most_expensive = comparison_df.iloc[-1]
+                cost_difference = most_expensive['Annual Cost (€M)'] - cheapest['Annual Cost (€M)']
+                
+                cheapest_transmission = transmission_df[transmission_df['Country'] == cheapest['Country']].iloc[0]
+                most_expensive_transmission = transmission_df[transmission_df['Country'] == most_expensive['Country']].iloc[0]
+                
+                # Modern metrics with better styling
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric(
+                        "🏆 Cheapest (Wholesale)", 
+                        f"€{cheapest['Annual Cost (€M)']:.1f}M",
+                        delta=f"With transmission: €{cheapest_transmission['Annual Cost with Transmission (€M)']:.1f}M"
+                    )
+                    st.caption(f"**{cheapest['Country']}**")
+                
+                with col2:
+                    st.metric(
+                        "💸 Most Expensive (Wholesale)", 
+                        f"€{most_expensive['Annual Cost (€M)']:.1f}M",
+                        delta=f"With transmission: €{most_expensive_transmission['Annual Cost with Transmission (€M)']:.1f}M"
+                    )
+                    st.caption(f"**{most_expensive['Country']}**")
+                
+                with col3:
+                    transmission_cost_diff = most_expensive_transmission['Annual Cost with Transmission (€M)'] - cheapest_transmission['Annual Cost with Transmission (€M)']
+                    st.metric(
+                        "📊 Cost Difference", 
+                        f"€{cost_difference:.1f}M", 
+                        delta=f"{((most_expensive['Annual Cost (€M)'] / cheapest['Annual Cost (€M)']) - 1) * 100:.1f}% more"
+                    )
+                    st.caption(f"With transmission: €{transmission_cost_diff:.1f}M difference")
+                
+                # Summary insights
+                st.subheader("📋 Summary")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.success(f"""
+                    **🎯 Best Choice: {cheapest['Country']}**
+                    
+                    - Lowest electricity costs
+                    - €{cheapest['Annual Cost (€M)']:.1f}M/year (wholesale)
+                    - €{cheapest_transmission['Annual Cost with Transmission (€M)']:.1f}M/year (with transmission)
+                    - Global rank: {cheapest['Rank']}
+                    """)
+                
+                with col2:
+                    st.warning(f"""
+                    **⚠️ Cost Impact**
+                    
+                    - Location choice matters: €{cost_difference:.1f}M difference
+                    - Transmission adds ~20% to costs
+                    - Total range: €{cheapest_transmission['Annual Cost with Transmission (€M)']:.1f}M - €{most_expensive_transmission['Annual Cost with Transmission (€M)']:.1f}M
+                    """)
         
-        # Summary statistics
-        st.subheader("Overall Cost Summary")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
+        with tab_insights:
+            st.subheader("💡 Key Insights & Recommendations")
+            
+            # Calculate insights
             cheapest_country = costs_df.iloc[0]['Country']
             cheapest_cost = costs_df.iloc[0]['Annual Cost (€M)']
-            st.metric("Cheapest Location", f"{cheapest_country}", f"€{cheapest_cost:.1f}M")
-        
-        with col2:
             most_expensive_country = costs_df.iloc[-1]['Country']
             most_expensive_cost = costs_df.iloc[-1]['Annual Cost (€M)']
-            st.metric("Most Expensive Location", f"{most_expensive_country}", f"€{most_expensive_cost:.1f}M")
-        
-        with col3:
             cost_range = most_expensive_cost - cheapest_cost
-            st.metric("Cost Range", f"€{cost_range:.1f}M")
-        
-        with col4:
             avg_cost = costs_df['Annual Cost (€M)'].mean()
-            st.metric("Average Cost", f"€{avg_cost:.1f}M")
+            
+            # Top insights
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.info(f"""
+                **🏆 Best Value Location**
+                
+                **{cheapest_country}** offers the lowest electricity costs at **€{cheapest_cost:.1f}M/year**.
+                
+                This represents a **{((most_expensive_cost / cheapest_cost) - 1) * 100:.0f}%** savings compared to the most expensive location.
+                """)
+            
+            with col2:
+                st.warning(f"""
+                **⚠️ Cost Impact**
+                
+                Location choice can impact your annual electricity costs by **€{cost_range:.1f}M**.
+                
+                The average cost across all countries is **€{avg_cost:.1f}M/year**.
+                """)
+            
+            # Cost categories
+            st.subheader("Cost Categories")
+            
+            # Calculate price-based ranking for cost categories
+            df_2024 = df[df['Date'].dt.year == 2024]
+            if len(df_2024) > 0:
+                price_rankings = df_2024.groupby('Country')['price_eur_mwh'].mean().reset_index()
+                price_rankings = price_rankings.sort_values('price_eur_mwh', ascending=True).reset_index(drop=True)
+            else:
+                price_rankings = df.groupby('Country')['price_eur_mwh'].last().reset_index()
+                price_rankings = price_rankings.sort_values('price_eur_mwh', ascending=True).reset_index(drop=True)
+            
+            # Categorize countries
+            low_cost_countries = []
+            medium_cost_countries = []
+            high_cost_countries = []
+            
+            for _, row in costs_df.iterrows():
+                country = row['Country']
+                rank = price_rankings[price_rankings['Country'] == country].index[0] + 1
+                total_countries = len(price_rankings)
+                
+                if rank <= total_countries * 0.33:
+                    low_cost_countries.append(country)
+                elif rank <= total_countries * 0.67:
+                    medium_cost_countries.append(country)
+                else:
+                    high_cost_countries.append(country)
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.success(f"**🟢 Low Cost Countries**\n\n{', '.join(low_cost_countries[:5])}")
+                if len(low_cost_countries) > 5:
+                    st.caption(f"+ {len(low_cost_countries) - 5} more")
+            
+            with col2:
+                st.warning(f"**🟡 Medium Cost Countries**\n\n{', '.join(medium_cost_countries[:5])}")
+                if len(medium_cost_countries) > 5:
+                    st.caption(f"+ {len(medium_cost_countries) - 5} more")
+            
+            with col3:
+                st.error(f"**🔴 High Cost Countries**\n\n{', '.join(high_cost_countries[:5])}")
+                if len(high_cost_countries) > 5:
+                    st.caption(f"+ {len(high_cost_countries) - 5} more")
+            
+            # Recommendations
+            st.subheader("📋 Recommendations")
+            
+            st.markdown(f"""
+            **For your {it_load_mw}MW data center with {utilization_rate*100:.0f}% utilization:**
+            
+            1. **Primary Recommendation**: Consider **{cheapest_country}** for the lowest operational costs
+            2. **Cost Range**: Budget between €{cheapest_cost:.1f}M - €{most_expensive_cost:.1f}M annually
+            3. **Transmission Impact**: Add ~20% to wholesale prices for transmission charges
+            4. **PUE Impact**: Your PUE of {pue} is {'excellent' if pue <= 1.2 else 'good' if pue <= 1.3 else 'average'}
+            5. **Utilization Impact**: {utilization_rate*100:.0f}% utilization is {'high' if utilization_rate >= 0.8 else 'good' if utilization_rate >= 0.7 else 'moderate'}
+            """)
         
-        # Download results
-        st.subheader("Download Results")
+        # Download section
+        st.subheader("📥 Download Results")
         col1, col2 = st.columns(2)
         
         with col1:
-            # CSV download
             csv = costs_df.to_csv(index=False)
             st.download_button(
                 label="Download Cost Analysis (CSV)",
@@ -783,7 +1023,6 @@ with tab2:
             )
         
         with col2:
-            # Create a summary report
             summary_text = f"""
 Data Center Cost Analysis Summary
 ================================
@@ -792,7 +1031,6 @@ Configuration:
 - IT Load: {it_load_mw} MW
 - Utilization Rate: {utilization_rate*100:.0f}%
 - PUE: {pue}
-- Average IT Load: {efficiency_metrics['Average IT Load (MW)']} MW
 - Total Facility Power: {efficiency_metrics['Total Facility Power (MW)']} MW
 - Annual Consumption: {efficiency_metrics['Annual Consumption (MWh)']:,} MWh
 
@@ -811,12 +1049,202 @@ Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                 mime="text/plain"
             )
     
-    # Add a clear results button if results are showing
+    # Clear results button
     if st.session_state.show_datacenter_results:
-        if st.button("Clear Results", type="secondary"):
+        if st.button("🗑️ Clear Results", type="secondary"):
             st.session_state.show_datacenter_results = False
             st.session_state.calc_params = {}
             st.rerun()
+
+with tab3:
+    # Interactive Map
+    st.header("🗺️ Interactive Map of European Electricity Prices")
+    
+    st.markdown("""
+    **Explore electricity prices across Europe with this interactive map.** 
+    Countries are color-coded by their average 2024 electricity prices, with darker colors indicating higher costs.
+    """)
+    
+    # Calculate 2024 average prices for mapping
+    df_2024 = df[df['Date'].dt.year == 2024]
+    if len(df_2024) > 0:
+        map_data = df_2024.groupby('Country')['price_eur_mwh'].mean().reset_index()
+        map_data = map_data.sort_values('price_eur_mwh', ascending=True)
+    else:
+        # Fallback to latest prices if no 2024 data
+        map_data = df.groupby('Country')['price_eur_mwh'].last().reset_index()
+        map_data = map_data.sort_values('price_eur_mwh', ascending=True)
+    
+    # Add country codes for mapping (ISO 3166-1 alpha-3)
+    country_codes = {
+        'Austria': 'AUT',
+        'Belgium': 'BEL', 
+        'Bulgaria': 'BGR',
+        'Croatia': 'HRV',
+        'Cyprus': 'CYP',
+        'Czech Republic': 'CZE',
+        'Denmark': 'DNK',
+        'Estonia': 'EST',
+        'Finland': 'FIN',
+        'France': 'FRA',
+        'Germany': 'DEU',
+        'Greece': 'GRC',
+        'Hungary': 'HUN',
+        'Ireland': 'IRL',
+        'Italy': 'ITA',
+        'Latvia': 'LVA',
+        'Lithuania': 'LTU',
+        'Luxembourg': 'LUX',
+        'Malta': 'MLT',
+        'Netherlands': 'NLD',
+        'Poland': 'POL',
+        'Portugal': 'PRT',
+        'Romania': 'ROU',
+        'Slovakia': 'SVK',
+        'Slovenia': 'SVN',
+        'Spain': 'ESP',
+        'Sweden': 'SWE',
+        'United Kingdom': 'GBR'
+    }
+    
+    # Add country codes to map data
+    map_data['Country_Code'] = map_data['Country'].map(country_codes)
+    
+    # Remove countries without country codes
+    map_data = map_data.dropna(subset=['Country_Code'])
+    
+    # Create the choropleth map
+    fig_map = px.choropleth(
+        map_data,
+        locations='Country_Code',
+        color='price_eur_mwh',
+        hover_name='Country',
+        hover_data={'price_eur_mwh': ':.2f', 'Country_Code': False},
+        color_continuous_scale=[[0, '#2E8B57'], [0.3, '#FFD700'], [0.7, '#FF8C00'], [1, '#DC143C']],
+        title="Average 2024 Electricity Prices in Europe (€/MWh)",
+        labels={'price_eur_mwh': 'Price (€/MWh)'},
+        scope='europe'
+    )
+    
+    # Update layout for better appearance
+    fig_map.update_layout(
+        height=600,
+        geo=dict(
+            showframe=False,
+            showcoastlines=True,
+            projection_type='equirectangular'
+        ),
+        title_font_size=18,
+        title_x=0.5,
+        font=dict(size=12, family="Arial, sans-serif"),
+        margin=dict(l=0, r=0, t=60, b=0)
+    )
+    
+    # Update colorbar
+    fig_map.update_coloraxes(
+        colorbar=dict(
+            title="Price (€/MWh)",
+            title_font_size=14,
+            tickfont_size=12,
+            len=0.8,
+            y=0.5,
+            yanchor='middle'
+        )
+    )
+    
+    # Display the map
+    st.plotly_chart(fig_map, width='stretch')
+    
+    # Add insights below the map
+    st.subheader("🗺️ Map Insights")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        cheapest_country = map_data.iloc[0]
+        st.success(f"""
+        **🏆 Cheapest: {cheapest_country['Country']}**
+        
+        €{cheapest_country['price_eur_mwh']:.2f}/MWh
+        """)
+    
+    with col2:
+        most_expensive_country = map_data.iloc[-1]
+        st.error(f"""
+        **💸 Most Expensive: {most_expensive_country['Country']}**
+        
+        €{most_expensive_country['price_eur_mwh']:.2f}/MWh
+        """)
+    
+    with col3:
+        price_range = most_expensive_country['price_eur_mwh'] - cheapest_country['price_eur_mwh']
+        st.info(f"""
+        **📊 Price Range**
+        
+        €{price_range:.2f}/MWh difference
+        """)
+    
+    # Add price categories
+    st.subheader("🎨 Price Categories")
+    
+    # Calculate price percentiles for categorization
+    q33 = map_data['price_eur_mwh'].quantile(0.33)
+    q67 = map_data['price_eur_mwh'].quantile(0.67)
+    
+    low_cost = map_data[map_data['price_eur_mwh'] <= q33]
+    medium_cost = map_data[(map_data['price_eur_mwh'] > q33) & (map_data['price_eur_mwh'] <= q67)]
+    high_cost = map_data[map_data['price_eur_mwh'] > q67]
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("**🟢 Low Cost Countries**")
+        for _, row in low_cost.iterrows():
+            st.caption(f"• {row['Country']}: €{row['price_eur_mwh']:.2f}/MWh")
+    
+    with col2:
+        st.markdown("**🟡 Medium Cost Countries**")
+        for _, row in medium_cost.iterrows():
+            st.caption(f"• {row['Country']}: €{row['price_eur_mwh']:.2f}/MWh")
+    
+    with col3:
+        st.markdown("**🔴 High Cost Countries**")
+        for _, row in high_cost.iterrows():
+            st.caption(f"• {row['Country']}: €{row['price_eur_mwh']:.2f}/MWh")
+    
+    # Add interactive features
+    st.subheader("🔍 Interactive Features")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **Map Controls:**
+        - **Hover** over countries to see exact prices
+        - **Zoom** in/out to explore specific regions
+        - **Pan** around to view different areas
+        - **Color scale** shows price ranges from green (low) to red (high)
+        """)
+    
+    with col2:
+        st.markdown("""
+        **Data Insights:**
+        - Prices are based on 2024 monthly averages
+        - Color coding uses 33rd and 67th percentiles
+        - Hover data shows precise values
+        - Map focuses on EU/EEA countries
+        """)
+    
+    # Add download option for map data
+    st.subheader("📥 Download Map Data")
+    
+    csv_map = map_data[['Country', 'price_eur_mwh']].to_csv(index=False)
+    st.download_button(
+        label="Download Country Prices (CSV)",
+        data=csv_map,
+        file_name="european_electricity_prices_2024.csv",
+        mime="text/csv"
+    )
 
 # Footer
 st.markdown("---")
